@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bhavyan Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+    --bg-color: #202123;
+    --card-color: #2a2b2e;
+    --text-color: #d1d5db;
+    --primary-color: #10a37f;
+    --secondary-color: #f97316;
+    --input-bg: #3a3b3f;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+.container { max-width: 900px; margin: 0 auto; padding: 20px; }
+.card { background-color: var(--card-color); padding: 20px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);}
+h1,h2 { text-align: center; }
+input, select, button { padding: 10px; margin: 5px 0; border-radius: 6px; border: none; font-size: 14px; }
+input, select { background-color: var(--input-bg); color: var(--text-color); }
+button { background-color: var(--primary-color); color: white; cursor: pointer; transition: 0.3s;}
+button:hover { background-color: var(--secondary-color);}
+.hidden { display: none; }
+table { width: 100%; border-collapse: collapse; margin-top: 10px;}
+th, td { border: 1px solid #444; padding: 8px; text-align: left;}
+th { background-color: #3b3c41;}
+.present { color: #10a37f; font-weight: bold; }
+.absent { color: #f97316; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- Login -->
+<div id="loginSection" class="card">
+    <h1>Login to Bhavyan Planner</h1>
+    <form id="loginForm">
+        <input type="text" id="username" placeholder="Username" required><br>
+        <input type="password" id="password" placeholder="Password" required><br>
+        <button type="submit">Login</button>
+        <button type="button" onclick="showSignup()">Sign Up</button><br>
+        <button type="button" onclick="showReset()">Forgot Password</button>
+    </form>
+</div>
+
+<!-- Signup -->
+<div id="signupSection" class="card hidden">
+    <h1>Sign Up for Bhavyan Planner</h1>
+    <form id="signupForm">
+        <input type="text" id="suUsername" placeholder="Username" required><br>
+        <input type="password" id="suPassword" placeholder="Password" required><br>
+        <button type="submit">Create Account</button>
+        <button type="button" onclick="showLogin()">Back to Login</button>
+    </form>
+</div>
+
+<!-- Reset Password via OTP -->
+<div id="resetSection" class="card hidden">
+    <h1>Reset Password - Bhavyan Planner</h1>
+    <form id="otpForm">
+        Username: <input type="text" id="resetUsername" placeholder="Username" required><br>
+        <button type="button" onclick="sendOTP()">Send OTP</button><br>
+        OTP: <input type="text" id="otpInput" placeholder="Enter OTP"><br>
+        New Password: <input type="password" id="newPassword" placeholder="New Password"><br>
+        <button type="button" onclick="verifyOTP()">Reset Password</button>
+        <button type="button" onclick="showLogin()">Back to Login</button>
+    </form>
+    <p id="otpDisplay" style="color:var(--primary-color)"></p>
+</div>
+
+<!-- Planner -->
+<div id="plannerSection" class="hidden">
+    <h1>Welcome to Bhavyan Planner, <span id="currentUser"></span></h1>
+    <div class="card">
+        <button onclick="showSection('profile')">Profiles</button>
+        <button onclick="showSection('schedule')">Schedule</button>
+        <button onclick="showSection('syllabus')">Syllabus</button>
+        <button onclick="showSection('attendance')">Attendance</button>
+        <button onclick="showSection('report')">Reports</button>
+        <button onclick="changePassword()">Change Password</button>
+        <button onclick="logout()">Logout</button>
+    </div>
+    <div id="content" class="card"></div>
+</div>
+
+</div>
+
+<script>
+// ---------- Auth ----------
+function getUsers(){ return JSON.parse(localStorage.getItem('users'))||[]; }
+function saveUsers(users){ localStorage.setItem('users', JSON.stringify(users)); }
+let currentUser = null;
+let currentOTP = null;
+
+// Login
+document.getElementById('loginForm').onsubmit = function(e){
+    e.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const users = getUsers();
+    const user = users.find(u=>u.username===username && u.password===password);
+    if(user){ currentUser = username; showPlanner(); }
+    else alert("Invalid username or password!");
+};
+
+// Signup
+document.getElementById('signupForm').onsubmit = function(e){
+    e.preventDefault();
+    const username = document.getElementById('suUsername').value;
+    const password = document.getElementById('suPassword').value;
+    const users = getUsers();
+    if(users.find(u=>u.username===username)){ alert("Username exists!"); return; }
+    users.push({username,password}); saveUsers(users); alert("Account created!"); showLogin();
+};
+
+// ---------- Show Sections ----------
+function showPlanner(){
+    document.getElementById('loginSection').classList.add('hidden');
+    document.getElementById('signupSection').classList.add('hidden');
+    document.getElementById('resetSection').classList.add('hidden');
+    document.getElementById('plannerSection').classList.remove('hidden');
+    document.getElementById('currentUser').innerText = currentUser;
+}
+function logout(){ currentUser=null; document.getElementById('plannerSection').classList.add('hidden'); document.getElementById('loginSection').classList.remove('hidden');}
+function showSignup(){ document.getElementById('loginSection').classList.add('hidden'); document.getElementById('signupSection').classList.remove('hidden'); }
+function showLogin(){ document.getElementById('signupSection').classList.add('hidden'); document.getElementById('resetSection').classList.add('hidden'); document.getElementById('loginSection').classList.remove('hidden'); }
+function showReset(){ document.getElementById('loginSection').classList.add('hidden'); document.getElementById('resetSection').classList.remove('hidden'); }
+
+// ---------- OTP Reset ----------
+function sendOTP(){
+    const username = document.getElementById('resetUsername').value;
+    if(!getUsers().find(u=>u.username===username)){ alert("User not found!"); return; }
+    currentOTP = Math.floor(100000 + Math.random()*900000); // 6-digit OTP
+    document.getElementById('otpDisplay').innerText = "Your OTP (simulated): "+currentOTP;
+}
+function verifyOTP(){
+    const entered = document.getElementById('otpInput').value;
+    const newPass = document.getElementById('newPassword').value;
+    if(parseInt(entered)===currentOTP){
+        const users = getUsers();
+        const user = users.find(u=>u.username===document.getElementById('resetUsername').value);
+        user.password = newPass; saveUsers(users); alert("Password reset successful!"); showLogin();
+    } else { alert("Invalid OTP!"); }
+}
+
+// Change Password
+function changePassword(){
+    const newPass = prompt("Enter new password:");
+    if(newPass){
+        const users = getUsers();
+        const user = users.find(u=>u.username===currentUser);
+        user.password = newPass; saveUsers(users); alert("Password changed successfully!");
+    }
+}
+
+// ---------- Planner Data ----------
+function getData(key){ if(!currentUser) return []; return JSON.parse(localStorage.getItem(currentUser+'_'+key))||[]; }
+function saveData(key,data){ if(!currentUser) return; localStorage.setItem(currentUser+'_'+key,JSON.stringify(data)); }
+
+// ---------- Planner Sections ----------
+function showSection(section){
+    const content = document.getElementById('content'); content.innerHTML='';
+    if(section==='profile') manageProfiles();
+    if(section==='schedule') manageSchedule();
+    if(section==='syllabus') manageSyllabus();
+    if(section==='attendance') manageAttendance();
+    if(section==='report') viewReports();
+}
+
+// Profiles
+function manageProfiles(){
+    const content = document.getElementById('content');
+    content.innerHTML=`<h2>Profiles</h2>
+    <input type="text" id="pname" placeholder="Name">
+    <input type="email" id="pemail" placeholder="Email">
+    <button onclick="addProfile()">Add</button>
+    <table id="profileTable"><tr><th>Name</th><th>Email</th></tr></table>`;
+    displayProfiles();
+}
+function addProfile(){
+    const profiles=getData('profiles');
+    profiles.push({name:document.getElementById('pname').value,email:document.getElementById('pemail').value});
+    saveData('profiles',profiles); displayProfiles();
+}
+function displayProfiles(){
+    const table=document.getElementById('profileTable'); table.innerHTML="<tr><th>Name</th><th>Email</th></tr>";
+    getData('profiles').forEach(p=>{ const row=table.insertRow(); row.insertCell(0).innerText=p.name; row.insertCell(1).innerText=p.email;});
+}
+
+// Schedule
+function manageSchedule(){
+    const content=document.getElementById('content');
+    content.innerHTML=`<h2>Schedule</h2>
+    <input type="text" id="subj" placeholder="Subject">
+    <input type="text" id="topic" placeholder="Topic">
+    <input type="date" id="sdate">
+    <button onclick="addSchedule()">Add</button>
+    <table id="scheduleTable"><tr><th>Date</th><th>Subject</th><th>Topic</th></tr></table>`;
+    displaySchedule();
+}
+function addSchedule(){
+    const schedules=getData('schedule');
+    schedules.push({subject:document.getElementById('subj').value,topic:document.getElementById('topic').value,date:document.getElementById('sdate').value});
+    saveData('schedule',schedules); displaySchedule();
+}
+function displaySchedule(){
+    const table=document.getElementById('scheduleTable'); table.innerHTML="<tr><th>Date</th><th>Subject</th><th>Topic</th></tr>";
+    getData('schedule').forEach(s=>{ const row=table.insertRow(); row.insertCell(0).innerText=s.date; row.insertCell(1).innerText=s.subject; row.insertCell(2).innerText=s.topic;});
+}
+
+// Attendance
+function manageAttendance(){
+    const content=document.getElementById('content');
+    const schedules=getData('schedule');
+    if(schedules.length===0){ content.innerHTML="<p>No schedule found.</p>"; return; }
+    let html=`<h2>Attendance</h2><input type="date" id="attDate">`;
+    schedules.forEach((s,i)=>{ html+=`<div>${s.subject} (${s.topic}): <select id="att${i}"><option value="1">Present</option><option value="0">Absent</option></select></div>`});
+    html+=`<button onclick="saveAttendance()">Save Attendance</button>`;
+    content.innerHTML=html;
+}
+function saveAttendance(){
+    const attendance=getData('attendance'); const schedules=getData('schedule');
+    const date=document.getElementById('attDate').value;
+    schedules.forEach((s,i)=>{ attendance.push({subject:s.subject,topic:s.topic,date:date,present:document.getElementById(`att${i}`).value}); });
+    saveData('attendance',attendance); alert("Attendance saved!");
+}
+
+// Reports + Charts
+function viewReports(){
+    const content = document.getElementById('content');
+    const attendance=getData('attendance');
+    const schedule=getData('schedule');
+
+    if(attendance.length===0){ content.innerHTML="<p>No attendance records.</p>"; return; }
+
+    let html=`<h2>Attendance Report</h2>
+              <table><tr><th>Date</th><th>Subject</th><th>Topic</th><th>Status</th></tr>`;
+    attendance.forEach(a=>{
+        html+=`<tr><td>${a.date}</td><td>${a.subject}</td><td>${a.topic}</td><td class="${a.present==1?'present':'absent'}">${a.present==1?'Present':'Absent'}</td></tr>`;
+    });
+    html+="</table>";
+
+    html+=`<h2>Weekly Attendance Chart</h2>
+           <canvas id="weeklyChart" height="200"></canvas>
+           <h2>Daily Topics Completed</h2>
+           <canvas id="dailyChart" height="200"></canvas>`;
+
+    content.innerHTML=html;
+
+    // Weekly Attendance Chart
+    let weeklyData = {};
+    attendance.forEach(a=>{
+        let week = getWeekNumber(new Date(a.date));
+        if(!weeklyData[week]) weeklyData[week] = {present:0, absent:0};
+        a.present==1 ? weeklyData[week].present++ : weeklyData[week].absent++;
+    });
+
+    const weeks = Object.keys(weeklyData);
+    const presentCounts = weeks.map(w=>weeklyData[w].present);
+    const absentCounts = weeks.map(w=>weeklyData[w].absent);
+
+    new Chart(document.getElementById('weeklyChart'), {
+        type: 'bar',
+        data: {
+            labels: weeks.map(w=>"Week "+w),
+            datasets: [
+                { label: 'Present', data: presentCounts, backgroundColor: '#10a37f' },
+                { label: 'Absent', data: absentCounts, backgroundColor: '#f97316' }
+            ]
+        },
+        options: { responsive:true, plugins:{legend:{position:'top'}}, scales:{y:{beginAtZero:true}} }
+    });
+
+    // Daily Topics Chart
+    let dailyData = {};
+    schedule.forEach(s=>{
+        if(!dailyData[s.date]) dailyData[s.date] = 0;
+        dailyData[s.date]++;
+    });
+
+    const dates = Object.keys(dailyData).sort();
+    const topicCounts = dates.map(d=>dailyData[d]);
+
+    new Chart(document.getElementById('dailyChart'), {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'Topics Completed',
+                data: topicCounts,
+                borderColor: '#10a37f',
+                backgroundColor: 'rgba(16,163,127,0.2)',
+                fill: true,
+                tension:0.3
+            }]
+        },
+        options: { responsive:true, plugins:{legend:{position:'top'}}, scales:{y:{beginAtZero:true}} }
+    });
+}
+
+// Helper: Week number
+function getWeekNumber(d) {
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    let dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    let yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+}
+</script>
+
+</body>
+</html>
